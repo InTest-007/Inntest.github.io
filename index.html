@@ -1,0 +1,1000 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Waze Guatemala</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #000;
+            overflow: hidden;
+        }
+
+        #map {
+            width: 100%;
+            height: 100vh;
+        }
+
+        /* PANEL DE SELECCIÓN INICIAL */
+        .selection-panel {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px;
+            z-index: 1000;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .selection-panel.hidden {
+            display: none;
+        }
+
+        .panel-title {
+            color: white;
+            font-size: 18px;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .selection-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background: rgba(255,255,255,0.1);
+            padding: 15px;
+            border-radius: 8px;
+            backdrop-filter: blur(10px);
+        }
+
+        .location-label {
+            color: rgba(255,255,255,0.8);
+            font-size: 12px;
+            min-width: 60px;
+            text-transform: uppercase;
+            font-weight: 600;
+        }
+
+        .location-display {
+            flex: 1;
+            background: white;
+            padding: 10px 15px;
+            border-radius: 6px;
+            color: #333;
+            font-size: 14px;
+            font-weight: 500;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .location-display.empty {
+            color: #999;
+            font-style: italic;
+        }
+
+        .clear-btn {
+            background: rgba(255,255,255,0.2);
+            color: white;
+            border: none;
+            padding: 8px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.2s;
+        }
+
+        .clear-btn:hover {
+            background: rgba(255,255,255,0.3);
+        }
+
+        .presets-container {
+            display: flex;
+            gap: 10px;
+            overflow-x: auto;
+            padding: 5px 0;
+        }
+
+        .preset-btn {
+            background: rgba(255,255,255,0.2);
+            color: white;
+            border: 1px solid rgba(255,255,255,0.3);
+            padding: 8px 16px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 600;
+            white-space: nowrap;
+            transition: all 0.2s;
+        }
+
+        .preset-btn:hover {
+            background: rgba(255,255,255,0.3);
+            border-color: rgba(255,255,255,0.5);
+        }
+
+        /* PANEL DE RUTA */
+        .route-panel {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: linear-gradient(to top, rgba(0,0,0,0.95), rgba(0,0,0,0.8));
+            backdrop-filter: blur(10px);
+            padding: 20px;
+            z-index: 500;
+            display: none;
+            flex-direction: column;
+            gap: 15px;
+            max-height: 60vh;
+            overflow-y: auto;
+            border-radius: 20px 20px 0 0;
+            box-shadow: 0 -4px 20px rgba(0,0,0,0.3);
+        }
+
+        .route-panel.active {
+            display: flex;
+        }
+
+        .drag-handle {
+            width: 40px;
+            height: 4px;
+            background: rgba(255,255,255,0.3);
+            border-radius: 2px;
+            margin: 0 auto 10px;
+        }
+
+        .route-info {
+            display: flex;
+            justify-content: space-around;
+            text-align: center;
+            padding: 15px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .info-block {
+            flex: 1;
+        }
+
+        .info-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        .info-label {
+            font-size: 12px;
+            color: #aaa;
+            margin-top: 5px;
+            text-transform: uppercase;
+        }
+
+        .instructions-list {
+            max-height: 200px;
+            overflow-y: auto;
+            margin: 15px 0;
+            padding: 10px 0;
+        }
+
+        .instruction-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+            color: #ccc;
+            font-size: 13px;
+        }
+
+        .instruction-item:last-child {
+            border-bottom: none;
+        }
+
+        .instruction-icon {
+            font-size: 20px;
+            min-width: 25px;
+        }
+
+        .buttons-container {
+            display: flex;
+            gap: 12px;
+            margin-top: 15px;
+        }
+
+        .btn-start {
+            flex: 1;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 16px;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-start:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-simulate {
+            flex: 1;
+            background: #FF9800;
+            color: white;
+            border: none;
+            padding: 16px;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-simulate:hover {
+            background: #F57C00;
+            transform: translateY(-2px);
+        }
+
+        .btn-modify {
+            flex: 1;
+            background: rgba(255,255,255,0.1);
+            color: white;
+            border: 1px solid rgba(255,255,255,0.2);
+            padding: 16px;
+            border-radius: 10px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-modify:hover {
+            background: rgba(255,255,255,0.15);
+            border-color: rgba(255,255,255,0.3);
+        }
+
+        /* PANEL DE NAVEGACIÓN */
+        .navigation-panel {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.9);
+            z-index: 2000;
+            display: none;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        .navigation-panel.active {
+            display: flex;
+        }
+
+        .nav-instruction {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            padding: 40px 20px;
+            animation: fadeIn 0.5s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0.7; }
+            to { opacity: 1; }
+        }
+
+        .nav-icon {
+            font-size: 80px;
+            margin-bottom: 20px;
+            animation: bounce 0.5s ease;
+        }
+
+        @keyframes bounce {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+        }
+
+        .nav-text h2 {
+            font-size: 28px;
+            color: #667eea;
+            margin-bottom: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+
+        .nav-text p {
+            font-size: 16px;
+            color: #ccc;
+        }
+
+        .nav-stats {
+            display: flex;
+            justify-content: space-around;
+            background: rgba(102,126,234,0.1);
+            padding: 20px;
+            border-top: 1px solid rgba(102,126,234,0.3);
+            border-bottom: 1px solid rgba(102,126,234,0.3);
+        }
+
+        .nav-stat {
+            text-align: center;
+        }
+
+        .nav-stat-value {
+            font-size: 28px;
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        .nav-stat-label {
+            font-size: 11px;
+            color: #aaa;
+            margin-top: 5px;
+            text-transform: uppercase;
+        }
+
+        .nav-controls {
+            padding: 20px;
+            display: flex;
+            gap: 12px;
+        }
+
+        .btn-pause {
+            flex: 1;
+            background: #FF9800;
+            color: white;
+            border: none;
+            padding: 16px;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-pause:hover {
+            background: #F57C00;
+        }
+
+        .btn-end {
+            flex: 1;
+            background: #f44336;
+            color: white;
+            border: none;
+            padding: 16px;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-end:hover {
+            background: #d32f2f;
+        }
+
+        .status-indicator {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 999;
+            background: #4CAF50;
+            color: white;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .status-indicator.offline {
+            background: #FF9800;
+        }
+
+        ::-webkit-scrollbar {
+            width: 4px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #667eea;
+            border-radius: 2px;
+        }
+
+        @media (max-width: 768px) {
+            .selection-panel {
+                padding: 15px;
+                gap: 12px;
+            }
+
+            .selection-row {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .buttons-container {
+                flex-direction: column;
+            }
+
+            .btn-start, .btn-simulate, .btn-modify {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Mapa -->
+    <div id="map"></div>
+
+    <!-- Indicador de estado -->
+    <div class="status-indicator" id="statusIndicator">🟢 Conectado</div>
+
+    <!-- PANEL DE SELECCIÓN -->
+    <div class="selection-panel" id="selectionPanel">
+        <div class="panel-title">📍 Planifica tu ruta</div>
+
+        <div class="selection-row">
+            <div class="location-label">Partida</div>
+            <div class="location-display empty" id="originDisplay">Haz clic en el mapa</div>
+            <button class="clear-btn" id="clearOriginBtn" onclick="clearOrigin()" style="display:none;">✕</button>
+        </div>
+
+        <div class="selection-row">
+            <div class="location-label">Destino</div>
+            <div class="location-display empty" id="destinationDisplay">Haz clic en el mapa</div>
+            <button class="clear-btn" id="clearDestinationBtn" onclick="clearDestination()" style="display:none;">✕</button>
+        </div>
+
+        <div class="presets-container" id="presetsContainer"></div>
+    </div>
+
+    <!-- PANEL DE RUTA -->
+    <div class="route-panel" id="routePanel">
+        <div class="drag-handle"></div>
+
+        <div class="route-info">
+            <div class="info-block">
+                <div class="info-value" id="distanceDisplay">0 km</div>
+                <div class="info-label">Distancia</div>
+            </div>
+            <div class="info-block">
+                <div class="info-value" id="timeDisplay">0 min</div>
+                <div class="info-label">Tiempo</div>
+            </div>
+        </div>
+
+        <div class="instructions-list" id="instructionsList"></div>
+
+        <div class="buttons-container">
+            <button class="btn-start" onclick="startNavigation()">Comenzar</button>
+            <button class="btn-simulate" onclick="startSimulation()">🎬 Simular</button>
+            <button class="btn-modify" onclick="modifyRoute()">Modificar</button>
+        </div>
+    </div>
+
+    <!-- PANEL DE NAVEGACIÓN -->
+    <div class="navigation-panel" id="navigationPanel">
+        <div class="nav-instruction">
+            <div>
+                <div class="nav-icon" id="navIcon">➡️</div>
+                <div class="nav-text">
+                    <h2 id="navInstruction">Iniciando navegación...</h2>
+                    <p id="navDetail">Sigue las indicaciones</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="nav-stats">
+            <div class="nav-stat">
+                <div class="nav-stat-value" id="navDistance">0 km</div>
+                <div class="nav-stat-label">Distancia</div>
+            </div>
+            <div class="nav-stat">
+                <div class="nav-stat-value" id="navTime">0 min</div>
+                <div class="nav-stat-label">Tiempo</div>
+            </div>
+            <div class="nav-stat">
+                <div class="nav-stat-value" id="navSpeed">0 km/h</div>
+                <div class="nav-stat-label">Velocidad</div>
+            </div>
+        </div>
+
+        <div class="nav-controls">
+            <button class="btn-pause" id="pauseBtn" onclick="togglePause()">⏸ Pausar</button>
+            <button class="btn-end" onclick="endNavigation()">Finalizar</button>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/turf.js/6/turf.min.js"></script>
+
+    <script>
+        // ============ ESTADO GLOBAL ============
+        let map;
+        let isOnline = navigator.onLine;
+        let selectedOrigin = null;
+        let selectedDestination = null;
+        let currentRoute = null;
+        let currentRouteCoordinates = [];
+        let selectionStep = 'origin';
+        let instructions = [];
+
+        // NAVEGACIÓN EN TIEMPO REAL
+        let navigationActive = false;
+        let navigationPaused = false;
+        let simulationMode = false;
+        let currentInstructionIndex = 0;
+        let navigationInterval = null;
+        let remainingDistance = 0;
+        let remainingTime = 0;
+        let currentSpeed = 0;
+        let synth = window.speechSynthesis;
+
+        // UBICACIONES
+        const locations = {
+            'zone1': { name: 'Zona 1 (Centro)', lat: 14.6349, lng: -90.5069 },
+            'zone3': { name: 'Zona 3', lat: 14.6200, lng: -90.5150 },
+            'zone10': { name: 'Zona 10', lat: 14.6175, lng: -90.4848 },
+            'zone18': { name: 'Zona 18', lat: 14.5800, lng: -90.5200 },
+            'airport': { name: 'Aeropuerto La Aurora', lat: 14.5833, lng: -90.5333 }
+        };
+
+        const presets = [
+            { name: 'Zona 1 → Zona 10', origin: 'zone1', dest: 'zone10' },
+            { name: 'Zona 1 → Zona 3', origin: 'zone1', dest: 'zone3' },
+            { name: 'Zona 1 → Aeropuerto', origin: 'zone1', dest: 'airport' },
+            { name: 'Zona 10 → Zona 18', origin: 'zone10', dest: 'zone18' }
+        ];
+
+        // ============ INICIALIZACIÓN ============
+        function init() {
+            initMap();
+            initPresets();
+            updateStatus();
+            window.addEventListener('online', updateStatus);
+            window.addEventListener('offline', updateStatus);
+        }
+
+        function initMap() {
+            map = L.map('map', {
+                zoomControl: false,
+                attributionControl: false
+            }).setView([14.6349, -90.5069], 12);
+
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                maxZoom: 19
+            }).addTo(map);
+
+            map.on('click', onMapClick);
+        }
+
+        function initPresets() {
+            const container = document.getElementById('presetsContainer');
+            container.innerHTML = presets.map(p => 
+                `<button class="preset-btn" onclick="loadPreset('${p.origin}', '${p.dest}')">${p.name}</button>`
+            ).join('');
+        }
+
+        // ============ SELECCIÓN EN MAPA ============
+        function onMapClick(e) {
+            const { lat, lng } = e.latlng;
+            const location = { 
+                name: `Personalizado (${lat.toFixed(3)}, ${lng.toFixed(3)})`, 
+                lat, 
+                lng 
+            };
+
+            if (selectionStep === 'origin') {
+                selectedOrigin = location;
+                updateOriginDisplay();
+                selectionStep = 'destination';
+            } else if (selectionStep === 'destination') {
+                selectedDestination = location;
+                updateDestinationDisplay();
+                selectionStep = 'origin';
+                calculateRoute();
+            }
+
+            redrawMap();
+        }
+
+        function updateOriginDisplay() {
+            const display = document.getElementById('originDisplay');
+            const btn = document.getElementById('clearOriginBtn');
+            display.textContent = selectedOrigin.name;
+            display.classList.remove('empty');
+            btn.style.display = 'block';
+        }
+
+        function updateDestinationDisplay() {
+            const display = document.getElementById('destinationDisplay');
+            const btn = document.getElementById('clearDestinationBtn');
+            display.textContent = selectedDestination.name;
+            display.classList.remove('empty');
+            btn.style.display = 'block';
+        }
+
+        function clearOrigin() {
+            selectedOrigin = null;
+            document.getElementById('originDisplay').textContent = 'Haz clic en el mapa';
+            document.getElementById('originDisplay').classList.add('empty');
+            document.getElementById('clearOriginBtn').style.display = 'none';
+            document.getElementById('routePanel').classList.remove('active');
+            redrawMap();
+        }
+
+        function clearDestination() {
+            selectedDestination = null;
+            document.getElementById('destinationDisplay').textContent = 'Haz clic en el mapa';
+            document.getElementById('destinationDisplay').classList.add('empty');
+            document.getElementById('clearDestinationBtn').style.display = 'none';
+            document.getElementById('routePanel').classList.remove('active');
+            redrawMap();
+        }
+
+        function loadPreset(origin, dest) {
+            selectedOrigin = locations[origin];
+            selectedDestination = locations[dest];
+            updateOriginDisplay();
+            updateDestinationDisplay();
+            calculateRoute();
+        }
+
+        // ============ CALCULAR RUTA ============
+        async function calculateRoute() {
+            if (!selectedOrigin || !selectedDestination) return;
+
+            try {
+                if (isOnline) {
+                    await calculateRouteOSRM();
+                } else {
+                    calculateOfflineRoute();
+                }
+            } catch (error) {
+                console.error(error);
+            }
+        }
+
+        async function calculateRouteOSRM() {
+            try {
+                const response = await fetch(
+                    `https://router.project-osrm.org/route/v1/driving/${selectedOrigin.lng},${selectedOrigin.lat};${selectedDestination.lng},${selectedDestination.lat}?overview=full&geometries=geojson&steps=true&annotations=distance,duration`
+                );
+
+                if (!response.ok) throw new Error('Error');
+                const data = await response.json();
+                if (data.routes.length === 0) throw new Error('No route');
+
+                const route = data.routes[0];
+                currentRouteCoordinates = route.geometry.coordinates;
+                displayRoute(route.distance, route.duration, route.legs);
+            } catch (error) {
+                calculateOfflineRoute();
+            }
+        }
+
+        function calculateOfflineRoute() {
+            const distance = turf.distance(
+                [selectedOrigin.lng, selectedOrigin.lat],
+                [selectedDestination.lng, selectedDestination.lat],
+                { units: 'kilometers' }
+            );
+
+            const duration = Math.round((distance / 40) * 60);
+            currentRouteCoordinates = [
+                [selectedOrigin.lng, selectedOrigin.lat],
+                [selectedDestination.lng, selectedDestination.lat]
+            ];
+
+            displayRoute(distance * 1000, duration * 60, []);
+        }
+
+        function displayRoute(distance, duration, legs) {
+            const distanceKm = (distance / 1000).toFixed(1);
+            const durationMin = Math.round(duration / 60);
+
+            document.getElementById('distanceDisplay').textContent = `${distanceKm} km`;
+            document.getElementById('timeDisplay').textContent = `${durationMin} min`;
+
+            generateInstructions(legs);
+            showRoutePanel();
+            redrawMap();
+        }
+
+        function generateInstructions(legs) {
+            instructions = [];
+
+            if (legs && legs.length > 0) {
+                legs.forEach(leg => {
+                    if (leg.steps) {
+                        leg.steps.forEach(step => {
+                            const maneuver = step.maneuver.type;
+                            const icon = getManeuverIcon(maneuver);
+                            const name = step.name || 'Camino';
+                            const dist = (step.distance / 1000).toFixed(1);
+
+                            instructions.push({
+                                icon,
+                                text: `${icon} ${maneuver} en ${name}`,
+                                detail: `${dist} km`
+                            });
+                        });
+                    }
+                });
+            }
+
+            const list = document.getElementById('instructionsList');
+            list.innerHTML = instructions.slice(0, 5).map(inst =>
+                `<div class="instruction-item">${inst.text} (${inst.detail})</div>`
+            ).join('');
+
+            if (instructions.length > 5) {
+                list.innerHTML += `<div class="instruction-item" style="color: #667eea; font-weight: 600;">+${instructions.length - 5} más indicaciones...</div>`;
+            }
+        }
+
+        function getManeuverIcon(maneuver) {
+            const icons = {
+                'turn': '↻', 'new name': '→', 'depart': '▶', 'arrive': '🎯',
+                'merge': '🔀', 'ramp': '⇒', 'on ramp': '⇒', 'off ramp': '↙',
+                'fork': '⑂', 'end of road': '⊣', 'continue': '→', 'roundabout': '⭕',
+                'turn right': '↗', 'turn left': '↖', 'turn sharp right': '⇗',
+                'turn sharp left': '⇖', 'turn slight right': '→', 'turn slight left': '←'
+            };
+            return icons[maneuver] || '→';
+        }
+
+        // ============ DIBUJAR EN MAPA ============
+        function redrawMap() {
+            map.eachLayer(layer => {
+                if (layer instanceof L.Marker || layer instanceof L.Polyline) {
+                    map.removeLayer(layer);
+                }
+            });
+
+            if (selectedOrigin) {
+                L.marker([selectedOrigin.lat, selectedOrigin.lng], {
+                    icon: L.icon({
+                        iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-green.png',
+                        iconSize: [25, 41]
+                    })
+                }).addTo(map).bindPopup(`<b>Partida:</b> ${selectedOrigin.name}`);
+            }
+
+            if (selectedDestination) {
+                L.marker([selectedDestination.lat, selectedDestination.lng], {
+                    icon: L.icon({
+                        iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
+                        iconSize: [25, 41]
+                    })
+                }).addTo(map).bindPopup(`<b>Destino:</b> ${selectedDestination.name}`);
+            }
+
+            if (currentRouteCoordinates.length > 0) {
+                L.polyline(
+                    currentRouteCoordinates.map(([lng, lat]) => [lat, lng]),
+                    { color: '#667eea', weight: 5, opacity: 0.8 }
+                ).addTo(map);
+            }
+
+            if (selectedOrigin && selectedDestination) {
+                const bounds = L.latLngBounds(
+                    [selectedOrigin.lat, selectedOrigin.lng],
+                    [selectedDestination.lat, selectedDestination.lng]
+                );
+                map.fitBounds(bounds, { padding: [100, 100] });
+            }
+        }
+
+        // ============ NAVEGACIÓN EN TIEMPO REAL ============
+        function startNavigation() {
+            navigationActive = true;
+            navigationPaused = false;
+            simulationMode = false;
+            currentInstructionIndex = 0;
+
+            remainingDistance = parseFloat(document.getElementById('distanceDisplay').textContent);
+            remainingTime = parseFloat(document.getElementById('timeDisplay').textContent);
+
+            document.getElementById('navigationPanel').classList.add('active');
+
+            updateNavigationRealTime();
+        }
+
+        function startSimulation() {
+            navigationActive = true;
+            navigationPaused = false;
+            simulationMode = true;
+            currentInstructionIndex = 0;
+
+            remainingDistance = parseFloat(document.getElementById('distanceDisplay').textContent);
+            remainingTime = parseFloat(document.getElementById('timeDisplay').textContent);
+
+            document.getElementById('navigationPanel').classList.add('active');
+
+            simulateNavigationFast();
+        }
+
+        function updateNavigationRealTime() {
+            if (!navigationActive || navigationPaused || simulationMode) return;
+
+            if (currentInstructionIndex < instructions.length) {
+                const instruction = instructions[currentInstructionIndex];
+                displayInstruction(instruction);
+                speakInstruction(instruction.text);
+                currentInstructionIndex++;
+            }
+
+            remainingDistance = Math.max(0, remainingDistance - 0.05);
+            remainingTime = Math.max(0, remainingTime - 0.1);
+            currentSpeed = 40 + Math.random() * 20;
+
+            document.getElementById('navDistance').textContent = remainingDistance.toFixed(1) + ' km';
+            document.getElementById('navTime').textContent = Math.round(remainingTime) + ' min';
+            document.getElementById('navSpeed').textContent = Math.round(currentSpeed) + ' km/h';
+
+            if (remainingDistance > 0) {
+                navigationInterval = setTimeout(updateNavigationRealTime, 300);
+            } else {
+                finishNavigation();
+            }
+        }
+
+        function simulateNavigationFast() {
+            if (!navigationActive || navigationPaused || !simulationMode) return;
+
+            if (currentInstructionIndex < instructions.length) {
+                const instruction = instructions[currentInstructionIndex];
+                displayInstruction(instruction);
+                speakInstruction(instruction.text);
+                currentInstructionIndex++;
+            }
+
+            remainingDistance = Math.max(0, remainingDistance - 0.3);
+            remainingTime = Math.max(0, remainingTime - 2);
+            currentSpeed = 30 + Math.sin(currentInstructionIndex) * 15;
+
+            document.getElementById('navDistance').textContent = remainingDistance.toFixed(1) + ' km';
+            document.getElementById('navTime').textContent = Math.round(remainingTime) + ' min';
+            document.getElementById('navSpeed').textContent = Math.round(currentSpeed) + ' km/h';
+
+            if (remainingDistance <= 0) {
+                setTimeout(() => {
+                    finishNavigation();
+                }, 2000);
+            } else {
+                navigationInterval = setTimeout(simulateNavigationFast, 6000);
+            }
+        }
+
+        function displayInstruction(instruction) {
+            document.getElementById('navIcon').textContent = instruction.icon;
+            document.getElementById('navInstruction').textContent = instruction.text
+                .replace(/↻|→|▶|🎯|🔀|⇒|↙|⑂|⊣|⭕|↗|↖|⇗|⇖|←/g, '')
+                .trim()
+                .toUpperCase();
+            document.getElementById('navDetail').textContent = instruction.detail;
+        }
+
+        function speakInstruction(text) {
+            synth.cancel();
+
+            const cleanText = text
+                .replace(/↻|→|▶|🎯|🔀|⇒|↙|⑂|⊣|⭕|↗|↖|⇗|⇖|←|🎯/g, '')
+                .replace(/turn/gi, 'gira')
+                .replace(/left/gi, 'a la izquierda')
+                .replace(/right/gi, 'a la derecha')
+                .replace(/continue/gi, 'continúa')
+                .replace(/arrive/gi, 'has llegado')
+                .replace(/depart/gi, 'comienza');
+
+            const utterance = new SpeechSynthesisUtterance(cleanText);
+            utterance.lang = 'es-ES';
+            utterance.rate = 1.0;
+            utterance.pitch = 1.0;
+            utterance.volume = 1.0;
+
+            try {
+                synth.speak(utterance);
+            } catch (error) {
+                console.log('Text-to-speech no disponible');
+            }
+        }
+
+        function finishNavigation() {
+            navigationActive = false;
+            clearTimeout(navigationInterval);
+            synth.cancel();
+
+            document.getElementById('navIcon').textContent = '🎉';
+            document.getElementById('navInstruction').textContent = '¡LLEGASTE A TU DESTINO!';
+            document.getElementById('navDetail').textContent = 'Gracias por usar Waze GTM';
+
+            const utterance = new SpeechSynthesisUtterance('Felicidades, has llegado a tu destino');
+            utterance.lang = 'es-ES';
+            synth.speak(utterance);
+
+            setTimeout(() => {
+                endNavigation();
+            }, 3000);
+        }
+
+        function togglePause() {
+            navigationPaused = !navigationPaused;
+            const btn = document.getElementById('pauseBtn');
+
+            if (navigationPaused) {
+                btn.textContent = '▶ Reanudar';
+                synth.pause();
+                clearTimeout(navigationInterval);
+            } else {
+                btn.textContent = '⏸ Pausar';
+                synth.resume();
+                
+                if (simulationMode) {
+                    simulateNavigationFast();
+                } else {
+                    updateNavigationRealTime();
+                }
+            }
+        }
+
+        function showRoutePanel() {
+            document.getElementById('routePanel').classList.add('active');
+        }
+
+        function modifyRoute() {
+            document.getElementById('routePanel').classList.remove('active');
+            selectedOrigin = null;
+            selectedDestination = null;
+            clearOrigin();
+            clearDestination();
+        }
+
+        function endNavigation() {
+            navigationActive = false;
+            navigationPaused = false;
+            clearTimeout(navigationInterval);
+            synth.cancel();
+            document.getElementById('navigationPanel').classList.remove('active');
+            currentInstructionIndex = 0;
+        }
+
+        function updateStatus() {
+            isOnline = navigator.onLine;
+            const indicator = document.getElementById('statusIndicator');
+            if (isOnline) {
+                indicator.textContent = '🟢 Conectado';
+                indicator.classList.remove('offline');
+            } else {
+                indicator.textContent = '🟠 Sin conexión';
+                indicator.classList.add('offline');
+            }
+        }
+
+        // Iniciar
+        init();
+    </script>
+</body>
+</html>
