@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Waze Guatemala</title>
+    <title>InnaTest1.0 - Navegador de Rutas</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
     <style>
         * {
@@ -452,7 +452,7 @@
 
     <!-- PANEL DE SELECCIÓN -->
     <div class="selection-panel" id="selectionPanel">
-        <div class="panel-title">📍 Planifica tu ruta</div>
+        <div class="panel-title">📍 InnaTest1.0 - Planifica tu ruta</div>
 
         <div class="selection-row">
             <div class="location-label">Partida</div>
@@ -918,7 +918,7 @@
             try {
                 synth.speak(utterance);
             } catch (error) {
-                console.log('Text-to-speech no disponible');
+                console.log('Text-to-speech no disponible en InnaTest1.0');
             }
         }
 
@@ -929,7 +929,7 @@
 
             document.getElementById('navIcon').textContent = '🎉';
             document.getElementById('navInstruction').textContent = '¡LLEGASTE A TU DESTINO!';
-            document.getElementById('navDetail').textContent = 'Gracias por usar Waze GTM';
+            document.getElementById('navDetail').textContent = 'Gracias por usar InnaTest1.0';
 
             const utterance = new SpeechSynthesisUtterance('Felicidades, has llegado a tu destino');
             utterance.lang = 'es-ES';
